@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Mindmapper</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <style media="screen">
+        #environment {
+            /*background-color: red;*/
+            width:100%;
+            height:100%;
+        }
+    </style>
+
+</head>
+<body>
+
+    <canvas id="environment" width="300" height="300"></canvas>
+
+    <script type="text/javascript">
+
+        getUniqueId = (function(){
+            var ID_COUNTER = 0;
+            return function(){
+                return ID_COUNTER++;
+            };
+        })();
+
+        Node = function() {
+
+            this.x = 0;
+            this.y = 0;
+            this.radius = 10;
+
+            this.vx = 0;
+            this.vy = 0;
+
+            this.id = getUniqueId();
+
+            this.neighbor = [];
+        };
+
+        Node.prototype.linkTo = function(n) {
+            for(var i = 0; i < this.neighbor.length; ++i)
+                if(n.id == this.neighbor[i].id) return; // We already have a link
+            this.neighbor.push(n);
+            n.neighbor.push(this);
+        };
+
+        Node.prototype.unlinkFrom = function(n) {
+            var remove = function(n, from){
+                for(var i = 0; i < from.neighbor.length; ++i)
+                {
+                    if(n.id == from.neighbor[i].id)
+                    {
+                        from.neighbor.splice(i,1);
+                        --i;
+                    }
+                }
+            };
+
+            remove(n,this);
+            remove(this,n);
+        };
+
+        Node.prototype.forceInteraction = function(n) {
+            var x = n.x - this.x;
+            var y = n.y - this.y;
+            var d = Math.sqrt(x*x + y*y);
+
+            var distmin = n.radius + this.radius;
+
+            var f = d > distmin ? 200/Math.pow(d-distmin,2) + d/2 : 2*distmin;
+
+            return { x: f*x/d, y: f*y/d };
+        };
+
+        Node.prototype.forceFriction = function() {
+            var coeff = 0;
+            return { x: -coeff*this.vx, y: -coeff*this.vy };
+        }
+
+        // On récupère le canvas
+        drawCanvas();
+
+        function drawCanvas()
+        {
+            canvas = document.getElementById("environment");
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            var ctx = canvas.getContext("2d");
+            var center_x = canvas.width/2, center_y = canvas.height/2;
+            ctx.translate(center_x, center_y);
+            ctx.scale(1,-1);
+
+            var n1 = new Node();
+            var n2 = new Node();
+
+            n2.x = 100;
+            n2.y = 100;
+
+            n1.linkTo(n2);
+
+            simulate();
+
+            function drawNode(n)
+            {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.radius, 0, 2*Math.PI, false);
+                ctx.fill();
+                ctx.stroke();
+
+                for(var i = 0; i < n.neighbor.length; ++i)
+                {
+                    ctx.beginPath();
+                    ctx.moveTo(n.x, n.y);
+                    ctx.lineTo(n.neighbor[i].x, n.neighbor[i].y);
+                    ctx.stroke();
+                }
+            }
+
+            function simulate()
+            {
+                var dt = 0.001;
+                var i = 0;
+
+                setInterval(function() {
+
+
+                    var F1I = n1.forceInteraction(n2), F1V = n1.forceFriction();
+                    var F2I = n2.forceInteraction(n1), F2V = n2.forceFriction();
+
+                    // Update n1
+                    n1.vx += dt*(F1I.x + F1V.x);
+                    n1.vy += dt*(F1I.y + F1V.y);
+                    n1.x += dt*(n1.vx);
+                    n1.y += dt*(n1.vy);
+
+                    // Update n2
+                    n2.vx += dt*(F1I.x + F1V.x);
+                    n2.vy += dt*(F1I.y + F1V.y);
+                    n2.x += dt*(n2.vx);
+                    n2.y += dt*(n2.vy);
+
+                    ctx.clearRect(-center_x,-center_y, canvas.width, canvas.height);
+                    drawNode(n1);
+                    drawNode(n2);
+
+
+                }, dt*1000);
+            }
+        }
+
+        window.onresize = drawCanvas;
+
+    </script>
+
+</body>
+</html>
